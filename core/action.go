@@ -4,7 +4,7 @@ import "encoding/json"
 
 type ActionHandlerInterface interface {
 	SetData(data string)
-	Do()
+	Do() string
 	TrigType() string
 	SetClient(client *Client)
 }

@@ -21,9 +21,11 @@ func (th *TriggersWorker) registerHandler(handler *TriggerHandler) {
 	th.triggers = append(th.triggers, handler)
 }
 
-func (th *TriggersWorker) defineTrigger(triggerType string) (*TriggerHandler, error) {
+func (th *TriggersWorker) defineTrigger(triggerType string, data string) (*TriggerHandler, error) {
 	for _, triggerHandler := range th.triggers {
 		if triggerHandler.TriggerType == triggerType {
+			//set data from action handler, that we send from Do method
+			triggerHandler.Action.SetData(data)
 			return triggerHandler, nil
 		}
 	}

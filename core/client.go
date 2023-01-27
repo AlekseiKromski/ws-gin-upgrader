@@ -42,8 +42,8 @@ func (c *Client) startReceiveChannel(app *App) {
 		}
 
 		actionHandler.Action.SetClient(c)
-		actionHandler.Action.Do()
-		triggerHandler, err := app.TriggersWorker.defineTrigger(actionHandler.Action.TrigType())
+		actionData := actionHandler.Action.Do()
+		triggerHandler, err := app.TriggersWorker.defineTrigger(actionHandler.Action.TrigType(), actionData)
 		if err != nil || triggerHandler == nil {
 			if err == nil {
 				err = fmt.Errorf("CAN'T FIND TRIGGER HANDLER")
