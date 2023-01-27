@@ -15,28 +15,33 @@ type App struct {
 	clients                []*Client
 	ActionsWorker          *ActionsWorker
 	TriggersWorker         *TriggersWorker
+	Hooks                  chan HookType
 }
 
-type WebSocket struct {
+type WebSocket struct{}
+
+type HookType struct {
+	HookType HookTypes
+	Data     string
 }
 
-func Start(actions []*ActionHandler, triggers []*TriggerHandler) (App, error) {
+func Start(actions []*ActionHandler, triggers []*TriggerHandler) (*App, error) {
 	//Try to load configuration
 	path := filepath.Join(".", "config.json")
 	config, err := LoadConfig(path)
 	if err != nil {
-		return App{}, err
+		return &App{}, err
 	}
 
 	app := App{config: config}
 	//Start application
 	app.runApp(actions, triggers)
 	//Up server and handle controller
-	err = app.serverUp()
+	go app.serverUp()
 	if err != nil {
-		return App{}, err
+		return &App{}, err
 	}
-	return app, nil
+	return &app, nil
 }
 
 func (app *App) registerTriggers(triggers []*TriggerHandler) {
@@ -57,9 +62,14 @@ func (app *App) registerWorkers() {
 }
 
 func (app *App) runApp(actions []*ActionHandler, triggers []*TriggerHandler) {
+	app.initHooksChannel()
 	app.registerWorkers()
 	app.registerActions(actions)
 	app.registerTriggers(triggers)
+}
+
+func (app *App) initHooksChannel() {
+	app.Hooks = make(chan HookType)
 }
 
 func (app *App) serverUp() error {
@@ -90,6 +100,12 @@ func (app *App) serverUp() error {
 		}
 		fmt.Println("Client was connected")
 		client := app.addClient(conn)
+
+		app.Hooks <- HookType{
+			HookType: CLIENT_ADDED,
+			Data:     string(client.ID),
+		}
+
 		client.Handler(app)
 	})
 
@@ -102,4 +118,8 @@ func (app *App) addClient(conn *websocket.Conn) *Client {
 	client := CreateNewClient(conn, &app.config)
 	app.clients = append(app.clients, client)
 	return client
+}
+
+func (app *App) getInstance() *App {
+	return app
 }

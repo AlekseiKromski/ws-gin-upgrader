@@ -14,8 +14,24 @@ var triggerHandlers = []*core.TriggerHandler{
 }
 
 func main() {
-	_, err := core.Start(actionHandlers, triggerHandlers)
+	app, err := core.Start(actionHandlers, triggerHandlers)
 	if err != nil {
 		fmt.Println(err)
 	}
+
+	//Example of working with hooks
+	go func() {
+		for {
+			select {
+			case hook := <-app.Hooks:
+				if hook.HookType == core.CLIENT_ADDED {
+					fmt.Println("hook :D")
+				}
+			}
+		}
+	}()
+
+	for {
+	}
+
 }
