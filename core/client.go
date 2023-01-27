@@ -38,23 +38,23 @@ func (c *Client) startReceiveChannel(app *App) {
 			if c.security.attemptsCount >= c.security.attemptsAllowed {
 				break
 			}
-		} else {
-			actionHandler.Action.SetClient(c)
-			actionHandler.Action.Do()
-			triggerHandler, err := app.TriggersWorker.defineTrigger(actionHandler.Action.TrigType())
-			if err != nil || triggerHandler == nil {
-				if err == nil {
-					err = fmt.Errorf("CAN'T FIND TRIGGER HANDLER")
-				}
-				fmt.Printf("error in trigger handler: %v", err)
-			}
-			triggerHandler.Action.SetClient(c)
-			triggerHandler.Action.SetClients(app.clients)
-			triggerHandler.Action.Do()
-
-			c.security.cleanAttempts()
+			continue
 		}
 
+		actionHandler.Action.SetClient(c)
+		actionHandler.Action.Do()
+		triggerHandler, err := app.TriggersWorker.defineTrigger(actionHandler.Action.TrigType())
+		if err != nil || triggerHandler == nil {
+			if err == nil {
+				err = fmt.Errorf("CAN'T FIND TRIGGER HANDLER")
+			}
+			fmt.Printf("error in trigger handler: %v", err)
+		}
+		triggerHandler.Action.SetClient(c)
+		triggerHandler.Action.SetClients(app.clients)
+		triggerHandler.Action.Do()
+
+		c.security.cleanAttempts()
 	}
 	defer c.Conn.Close()
 }
