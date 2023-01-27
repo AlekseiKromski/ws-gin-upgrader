@@ -12,7 +12,7 @@ type App struct {
 	config                 Config
 	server                 string
 	httpConnectionUpgraded websocket.Upgrader
-	clients                []*Client
+	Clients                []*Client
 	ActionsWorker          *ActionsWorker
 	TriggersWorker         *TriggersWorker
 	Hooks                  chan HookType
@@ -116,7 +116,7 @@ func (app *App) serverUp() error {
 
 func (app *App) addClient(conn *websocket.Conn) *Client {
 	client := CreateNewClient(conn, &app.config)
-	app.clients = append(app.clients, client)
+	app.Clients = append(app.Clients, client)
 	return client
 }
 

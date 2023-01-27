@@ -51,7 +51,7 @@ func (c *Client) startReceiveChannel(app *App) {
 			fmt.Printf("error in trigger handler: %v", err)
 		}
 		triggerHandler.Action.SetClient(c)
-		triggerHandler.Action.SetClients(app.clients)
+		triggerHandler.Action.SetClients(app.Clients)
 		triggerHandler.Action.Do()
 
 		c.security.cleanAttempts()
