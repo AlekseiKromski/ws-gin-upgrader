@@ -5,18 +5,8 @@ import (
 	"github.com/gorilla/websocket"
 	cors "github.com/rs/cors"
 	"net/http"
-	"path/filepath"
+	"sync"
 )
-
-type App struct {
-	config                 Config
-	server                 string
-	httpConnectionUpgraded websocket.Upgrader
-	Clients                []*Client
-	ActionsWorker          *ActionsWorker
-	TriggersWorker         *TriggersWorker
-	Hooks                  chan HookType
-}
 
 type WebSocket struct{}
 
@@ -25,47 +15,41 @@ type HookType struct {
 	Data     string
 }
 
-func Start(actions []*ActionHandler, triggers []*TriggerHandler) (*App, error) {
-	//Try to load configuration
-	path := filepath.Join(".", "config.json")
-	config, err := LoadConfig(path)
-	if err != nil {
-		return &App{}, err
+func NewHook(ht HookTypes, data string) HookType {
+	return HookType{
+		HookType: ht,
+		Data:     data,
 	}
+}
 
-	app := App{config: config}
+type App struct {
+	Hooks                  chan HookType
+	clients                Clients
+	handlers               Handlers
+	config                 *Config
+	server                 string
+	httpConnectionUpgraded websocket.Upgrader
+	mutex                  sync.Mutex
+}
+
+func Start(hs Handlers, conf *Config) (*App, error) {
+	app := App{config: conf, clients: make(Clients), mutex: sync.Mutex{}}
+
 	//Start application
-	app.runApp(actions, triggers)
+	app.runApp(hs)
 	//Up server and handle controller
 	go app.serverUp()
-	if err != nil {
-		return &App{}, err
-	}
+
 	return &app, nil
 }
 
-func (app *App) registerTriggers(triggers []*TriggerHandler) {
-	for _, trigger := range triggers {
-		app.TriggersWorker.registerHandler(trigger)
-	}
-}
-
-func (app *App) registerActions(actions []*ActionHandler) {
-	for _, action := range actions {
-		app.ActionsWorker.registerHandler(action)
-	}
-}
-
-func (app *App) registerWorkers() {
-	app.ActionsWorker = &ActionsWorker{}
-	app.TriggersWorker = &TriggersWorker{}
-}
-
-func (app *App) runApp(actions []*ActionHandler, triggers []*TriggerHandler) {
+func (app *App) runApp(hs Handlers) {
 	app.initHooksChannel()
-	app.registerWorkers()
-	app.registerActions(actions)
-	app.registerTriggers(triggers)
+	app.registerHandlers(hs)
+}
+
+func (app *App) registerHandlers(hs Handlers) {
+	app.handlers = hs
 }
 
 func (app *App) initHooksChannel() {
@@ -73,18 +57,8 @@ func (app *App) initHooksChannel() {
 }
 
 func (app *App) serverUp() error {
-	fmt.Println("Start server")
-
 	mux := http.NewServeMux()
-	corsSettings := cors.New(cors.Options{
-		AllowedOrigins: []string{"*"},
-		AllowedMethods: []string{
-			http.MethodGet,
-			http.MethodPost,
-		},
-		AllowedHeaders:   []string{"*"},
-		AllowCredentials: true,
-	})
+	corsSettings := cors.New(app.config.CorsOptions)
 	app.httpConnectionUpgraded = websocket.Upgrader{
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
@@ -98,28 +72,48 @@ func (app *App) serverUp() error {
 			fmt.Printf("problem while upgrade http connection to webscket: %v", err)
 			return
 		}
-		fmt.Println("Client was connected")
 		client := app.addClient(conn)
 
-		app.Hooks <- HookType{
-			HookType: CLIENT_ADDED,
-			Data:     string(client.ID),
-		}
+		app.sendHook(NewHook(CLIENT_ADDED, client.ID))
 
-		client.Handler(app)
+		if err := client.Handler(app); err != nil {
+			fmt.Printf("cannot handle client: %v", err)
+		}
 	})
 
 	handler := corsSettings.Handler(mux)
+	app.sendHook(NewHook(SERVER_STARTED, fmt.Sprintf("started on: %s", app.config.GetServerString())))
 	http.ListenAndServe(app.config.GetServerString(), handler)
 	return nil
 }
 
-func (app *App) addClient(conn *websocket.Conn) *Client {
-	client := CreateNewClient(conn, &app.config)
-	app.Clients = append(app.Clients, client)
-	return client
+func (app *App) sendHook(h HookType) {
+	select {
+	case app.Hooks <- h:
+	default:
+	}
 }
 
-func (app *App) getInstance() *App {
-	return app
+func (app *App) addClient(conn *websocket.Conn) *Client {
+	app.mutex.Lock()
+	defer app.mutex.Unlock()
+
+	for {
+		c := CreateNewClient(conn)
+		if app.clients[c.ID] == nil {
+			app.clients[c.ID] = c
+			return c
+		}
+	}
+}
+
+func (app *App) removeClient(id string) {
+	app.mutex.Lock()
+	defer app.mutex.Unlock()
+
+	if app.clients[id] == nil {
+		return
+	}
+
+	delete(app.clients, id)
 }

@@ -1,60 +1,87 @@
 package core
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/gorilla/websocket"
 	"github.com/kjk/betterguid"
 )
 
+type Clients map[string]*Client
+
 type Client struct {
-	Conn     *websocket.Conn
-	ID       string
-	security Security
+	Conn *websocket.Conn
+	ID   string
 }
 
-func CreateNewClient(connection *websocket.Conn, config *Config) *Client {
-	return &Client{Conn: connection, security: Security{attemptsAllowed: config.AttemptsAllowed, attemptsCount: 0}, ID: betterguid.New()}
+func CreateNewClient(connection *websocket.Conn) *Client {
+	return &Client{
+		Conn: connection,
+		ID:   betterguid.New(),
+	}
 }
 
-func (c *Client) Handler(app *App) {
+func (c *Client) Handler(app *App) error {
+	if err := c.Conn.WriteJSON(ActionModel{
+		Action:  USER_ID,
+		Payload: c.ID,
+	}); err != nil {
+		return fmt.Errorf("cannot send USER_ID: %v", err)
+	}
 	go c.startReceiveChannel(app)
+	return nil
 }
 
 func (c *Client) startReceiveChannel(app *App) {
+	defer func() {
+		c.Conn.Close()
+		app.removeClient(c.ID)
+	}()
+
 	for {
 		_, message, err := c.Conn.ReadMessage()
 		if err != nil {
-			fmt.Printf("error in clinet: %v", err)
-		}
-		fmt.Println(string(message))
-		c.security.doAttempt()
-		actionHandler, err := app.ActionsWorker.defineAction(message)
-		if err != nil || actionHandler == nil {
-			if err == nil {
-				err = fmt.Errorf("CAN'T FIND ACTION HANDLER")
+			if err, ok := err.(*websocket.CloseError); ok {
+				app.sendHook(NewHook(CLIENT_CLOSED_CONNECTION, fmt.Sprintf("connection closed: %v", err)))
+				return
 			}
-			fmt.Printf("action decoder error: %v", err)
 
-			if c.security.attemptsCount >= c.security.attemptsAllowed {
-				break
+			app.sendHook(NewHook(ERROR, fmt.Sprintf("error in clinet: %v", err)))
+			return
+		}
+
+		if app.config.Debug {
+			fmt.Printf("Payload: %s", string(message))
+		}
+
+		am := ActionModel{}
+		if err := json.Unmarshal(message, &am); err != nil {
+			if err := c.Conn.WriteJSON(ActionModel{
+				Action:  ERR_DECODE,
+				Payload: fmt.Sprintf("cannot decode your message: %v", err),
+			}); err != nil {
+				fmt.Printf("cannot send message: %v", err)
 			}
+		}
+
+		handler := app.handlers.DefineHandler(am.Action)
+		if handler == nil {
+			app.sendHook(NewHook(ERROR, fmt.Sprintf("cannot define handler: %s", am.Action)))
+			c.sendError(fmt.Sprintf("cannot define handler: %s", am.Action), app)
 			continue
 		}
 
-		actionHandler.Action.SetClient(c)
-		actionData := actionHandler.Action.Do()
-		triggerHandler, err := app.TriggersWorker.defineTrigger(actionHandler.Action.TrigType(), actionData)
-		if err != nil || triggerHandler == nil {
-			if err == nil {
-				err = fmt.Errorf("CAN'T FIND TRIGGER HANDLER")
-			}
-			fmt.Printf("error in trigger handler: %v", err)
-		}
-		triggerHandler.Action.SetClient(c)
-		triggerHandler.Action.SetClients(app.Clients)
-		triggerHandler.Action.Do()
-
-		c.security.cleanAttempts()
+		handler.Handle(am.Payload, c, app.clients)
 	}
-	defer c.Conn.Close()
+}
+
+func (c *Client) sendError(message string, app *App) {
+	am := ActionModel{
+		Action:  ERR_HANDLER,
+		Payload: message,
+	}
+
+	if err := c.Conn.WriteJSON(am); err != nil {
+		app.sendHook(NewHook(ERROR, fmt.Sprintf("cannot send message (%s): %v", message, err)))
+	}
 }
