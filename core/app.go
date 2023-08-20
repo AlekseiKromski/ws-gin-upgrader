@@ -3,7 +3,7 @@ package core
 import (
 	"fmt"
 	"github.com/gorilla/websocket"
-	cors "github.com/rs/cors"
+	"github.com/rs/cors"
 	"net/http"
 	"sync"
 )
@@ -25,14 +25,14 @@ func NewHook(ht HookTypes, data string) HookType {
 type App struct {
 	Hooks                  chan HookType
 	clients                Clients
-	handlers               Handlers
+	handlers               *Handlers
 	config                 *Config
 	server                 string
 	httpConnectionUpgraded websocket.Upgrader
 	mutex                  sync.Mutex
 }
 
-func Start(hs Handlers, conf *Config) (*App, error) {
+func Start(hs *Handlers, conf *Config) (*App, error) {
 	app := App{config: conf, clients: make(Clients), mutex: sync.Mutex{}}
 
 	//Start application
@@ -43,12 +43,12 @@ func Start(hs Handlers, conf *Config) (*App, error) {
 	return &app, nil
 }
 
-func (app *App) runApp(hs Handlers) {
+func (app *App) runApp(hs *Handlers) {
 	app.initHooksChannel()
 	app.registerHandlers(hs)
 }
 
-func (app *App) registerHandlers(hs Handlers) {
+func (app *App) registerHandlers(hs *Handlers) {
 	app.handlers = hs
 }
 
