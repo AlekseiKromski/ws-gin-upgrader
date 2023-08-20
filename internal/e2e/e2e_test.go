@@ -4,14 +4,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/AlekseiKromski/at-socket-server/core"
+	"github.com/gin-contrib/cors"
 	"github.com/gorilla/websocket"
-	"github.com/rs/cors"
 	"github.com/stretchr/testify/assert"
 	"log"
 	"net/http"
 	"net/url"
 	"sync"
 	"testing"
+	"time"
 )
 
 type senderPayload struct {
@@ -54,13 +55,13 @@ func Test_MessageSend(t *testing.T) {
 	handlers["SEND_MESSAGE"] = &SenderHandler{}
 
 	conf := &core.Config{
-		CorsOptions: cors.Options{
-			AllowedOrigins: []string{"*"},
-			AllowedMethods: []string{
+		CorsOptions: cors.Config{
+			AllowOrigins: []string{"*"},
+			AllowMethods: []string{
 				http.MethodGet,
 				http.MethodPost,
 			},
-			AllowedHeaders:   []string{"*"},
+			AllowHeaders:     []string{"*"},
 			AllowCredentials: true,
 		},
 		Host:  "localhost",
@@ -73,17 +74,20 @@ func Test_MessageSend(t *testing.T) {
 		fmt.Println(err)
 	}
 
-	//waiting server start event
-blocked:
-	for {
-		hook := <-app.Hooks
-		switch hook.HookType {
-		case core.SERVER_STARTED:
-			break blocked
+	go func() {
+		if err := app.Engine.Run(app.Config.GetServerString()); err != nil {
+			t.Fatalf("cannot start server: %v", err)
+			return
 		}
+	}()
+
+	//Block main thread until server started
+	if err := pingServerHelper(fmt.Sprintf("http://%s", app.Config.GetServerString())); err != nil {
+		t.Fatalf("error during server pinging: %v", err)
+		return
 	}
 
-	server_url := url.URL{Scheme: "ws", Host: "localhost:3000", Path: "/"}
+	server_url := url.URL{Scheme: "ws", Host: "localhost:3000", Path: "/ws/connect"}
 	ready := make(chan string)
 
 	//receiver
@@ -159,13 +163,13 @@ func Test_disconnect(t *testing.T) {
 	handlers["SEND_MESSAGE"] = &SenderHandler{}
 
 	conf := &core.Config{
-		CorsOptions: cors.Options{
-			AllowedOrigins: []string{"*"},
-			AllowedMethods: []string{
+		CorsOptions: cors.Config{
+			AllowOrigins: []string{"*"},
+			AllowMethods: []string{
 				http.MethodGet,
 				http.MethodPost,
 			},
-			AllowedHeaders:   []string{"*"},
+			AllowHeaders:     []string{"*"},
 			AllowCredentials: true,
 		},
 		Host:  "localhost",
@@ -178,17 +182,20 @@ func Test_disconnect(t *testing.T) {
 		fmt.Println(err)
 	}
 
-	//waiting server start event
-blockedOpen:
-	for {
-		hook := <-app.Hooks
-		switch hook.HookType {
-		case core.SERVER_STARTED:
-			break blockedOpen
+	go func() {
+		if err := app.Engine.Run(app.Config.GetServerString()); err != nil {
+			t.Fatalf("cannot start server: %v", err)
+			return
 		}
+	}()
+
+	//Block main thread until server started
+	if err := pingServerHelper(fmt.Sprintf("http://%s", app.Config.GetServerString())); err != nil {
+		t.Fatalf("error during server pinging: %v", err)
+		return
 	}
 
-	server_url := url.URL{Scheme: "ws", Host: "localhost:3000", Path: "/"}
+	server_url := url.URL{Scheme: "ws", Host: "localhost:3000", Path: "/ws/connect"}
 	c, _, err := websocket.DefaultDialer.Dial(server_url.String(), nil)
 	if err != nil {
 		log.Fatal("dial:", err)
@@ -217,13 +224,13 @@ func Test_callUndefinedHandlerAction(t *testing.T) {
 	handlers["SEND_MESSAGE"] = &SenderHandler{}
 
 	conf := &core.Config{
-		CorsOptions: cors.Options{
-			AllowedOrigins: []string{"*"},
-			AllowedMethods: []string{
+		CorsOptions: cors.Config{
+			AllowOrigins: []string{"*"},
+			AllowMethods: []string{
 				http.MethodGet,
 				http.MethodPost,
 			},
-			AllowedHeaders:   []string{"*"},
+			AllowHeaders:     []string{"*"},
 			AllowCredentials: true,
 		},
 		Host:  "localhost",
@@ -235,6 +242,13 @@ func Test_callUndefinedHandlerAction(t *testing.T) {
 	if err != nil {
 		fmt.Println(err)
 	}
+
+	go func() {
+		if err := app.Engine.Run(app.Config.GetServerString()); err != nil {
+			t.Fatalf("cannot start server: %v", err)
+			return
+		}
+	}()
 
 	go func() {
 		for {
@@ -250,17 +264,13 @@ func Test_callUndefinedHandlerAction(t *testing.T) {
 		}
 	}()
 
-	//waiting server start event
-blockedOpen:
-	for {
-		hook := <-app.Hooks
-		switch hook.HookType {
-		case core.SERVER_STARTED:
-			break blockedOpen
-		}
+	//Block main thread until server started
+	if err := pingServerHelper(fmt.Sprintf("http://%s", app.Config.GetServerString())); err != nil {
+		t.Fatalf("error during server pinging: %v", err)
+		return
 	}
 
-	server_url := url.URL{Scheme: "ws", Host: "localhost:3000", Path: "/"}
+	server_url := url.URL{Scheme: "ws", Host: "localhost:3000", Path: "/ws/connect"}
 	c, _, err := websocket.DefaultDialer.Dial(server_url.String(), nil)
 	if err != nil {
 		log.Fatal("dial:", err)
@@ -292,4 +302,19 @@ blockedOpen:
 	}
 
 	wg.Wait()
+}
+
+func pingServerHelper(url string) error {
+	for {
+		r, err := http.NewRequest(http.MethodGet, url, nil)
+		if err != nil {
+			return fmt.Errorf("cannot create request: %v", err)
+		}
+		if _, err = http.DefaultClient.Do(r); err != nil {
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+
+		return nil
+	}
 }
