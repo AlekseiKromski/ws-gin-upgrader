@@ -26,7 +26,7 @@ func (sh *SenderHandler) Handle(payload string, client *core.Client, clients cor
 
 	if err := json.Unmarshal([]byte(payload), &sp); err != nil {
 		if err := client.Conn.WriteJSON(core.ActionModel{
-			Action:  core.HandlerName(core.ERR_DECODE),
+			Action:  core.ERR_DECODE,
 			Payload: fmt.Sprintf("cannot decode payload: %v", err),
 		}); err != nil {
 			fmt.Printf("cannot send error back: %v", err)
@@ -68,7 +68,7 @@ func Test_MessageSend(t *testing.T) {
 		Debug: true,
 	}
 
-	app, err := core.Start(handlers, conf)
+	app, err := core.Start(&handlers, conf)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -173,7 +173,7 @@ func Test_disconnect(t *testing.T) {
 		Debug: true,
 	}
 
-	app, err := core.Start(handlers, conf)
+	app, err := core.Start(&handlers, conf)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -231,7 +231,7 @@ func Test_callUndefinedHandlerAction(t *testing.T) {
 		Debug: true,
 	}
 
-	app, err := core.Start(handlers, conf)
+	app, err := core.Start(&handlers, conf)
 	if err != nil {
 		fmt.Println(err)
 	}
