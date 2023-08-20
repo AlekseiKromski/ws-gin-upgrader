@@ -2,14 +2,14 @@ package core
 
 import (
 	"fmt"
-	"github.com/rs/cors"
+	"github.com/gin-contrib/cors"
 )
 
 type Config struct {
 	Port        int
 	Host        string
 	Debug       bool
-	CorsOptions cors.Options
+	CorsOptions cors.Config
 }
 
 func (c *Config) GetServerString() string {
