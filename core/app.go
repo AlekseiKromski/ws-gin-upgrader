@@ -2,8 +2,9 @@ package core
 
 import (
 	"fmt"
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"github.com/rs/cors"
 	"net/http"
 	"sync"
 )
@@ -24,21 +25,25 @@ func NewHook(ht HookTypes, data string) HookType {
 
 type App struct {
 	Hooks                  chan HookType
+	Engine                 *gin.Engine
+	Config                 *Config
 	clients                Clients
 	handlers               *Handlers
-	config                 *Config
 	server                 string
 	httpConnectionUpgraded websocket.Upgrader
 	mutex                  sync.Mutex
 }
 
 func Start(hs *Handlers, conf *Config) (*App, error) {
-	app := App{config: conf, clients: make(Clients), mutex: sync.Mutex{}}
+	app := App{Config: conf, clients: make(Clients), mutex: sync.Mutex{}}
 
 	//Start application
 	app.runApp(hs)
-	//Up server and handle controller
-	go app.serverUp()
+
+	//Configure server handlers and setup ws upgrader
+	if err := app.serverConfigure(); err != nil {
+		return nil, fmt.Errorf("cannot up server: %v", err)
+	}
 
 	return &app, nil
 }
@@ -56,9 +61,9 @@ func (app *App) initHooksChannel() {
 	app.Hooks = make(chan HookType)
 }
 
-func (app *App) serverUp() error {
-	mux := http.NewServeMux()
-	corsSettings := cors.New(app.config.CorsOptions)
+func (app *App) serverConfigure() error {
+	ginEngine := gin.Default()
+
 	app.httpConnectionUpgraded = websocket.Upgrader{
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
@@ -66,8 +71,9 @@ func (app *App) serverUp() error {
 			return true
 		},
 	}
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		conn, err := app.httpConnectionUpgraded.Upgrade(w, r, nil)
+
+	ginEngine.GET("/ws/connect", func(c *gin.Context) {
+		conn, err := app.httpConnectionUpgraded.Upgrade(c.Writer, c.Request, nil)
 		if err != nil {
 			fmt.Printf("problem while upgrade http connection to webscket: %v", err)
 			return
@@ -81,9 +87,12 @@ func (app *App) serverUp() error {
 		}
 	})
 
-	handler := corsSettings.Handler(mux)
-	app.sendHook(NewHook(SERVER_STARTED, fmt.Sprintf("started on: %s", app.config.GetServerString())))
-	http.ListenAndServe(app.config.GetServerString(), handler)
+	//Set cors
+	ginEngine.Use(cors.New(app.Config.CorsOptions))
+
+	app.Engine = ginEngine
+
+	app.sendHook(NewHook(SERVER_STARTED, fmt.Sprintf("gin egine created")))
 	return nil
 }
 

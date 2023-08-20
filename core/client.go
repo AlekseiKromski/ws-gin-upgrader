@@ -50,7 +50,7 @@ func (c *Client) startReceiveChannel(app *App) {
 			return
 		}
 
-		if app.config.Debug {
+		if app.Config.Debug {
 			fmt.Printf("Payload: %s", string(message))
 		}
 
