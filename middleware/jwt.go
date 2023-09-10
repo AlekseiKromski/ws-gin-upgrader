@@ -7,7 +7,7 @@ import (
 	"net/http"
 )
 
-func JwtCheck(secret string) func(ctx *gin.Context) {
+func JwtCheck(secret []byte) func(ctx *gin.Context) {
 	return func(c *gin.Context) {
 		tokenRequest := c.Request.Header.Get("Authorization")
 		if tokenRequest == "" || len(tokenRequest) < 10 {
