@@ -10,6 +10,7 @@ type Config struct {
 	Host        string
 	Debug       bool
 	CorsOptions cors.Config
+	JwtSecret   string
 }
 
 func (c *Config) GetServerString() string {

@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"github.com/AlekseiKromski/at-socket-server/middleware"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -72,20 +73,23 @@ func (app *App) serverConfigure() error {
 		},
 	}
 
-	ginEngine.GET("/ws/connect", func(c *gin.Context) {
-		conn, err := app.httpConnectionUpgraded.Upgrade(c.Writer, c.Request, nil)
-		if err != nil {
-			fmt.Printf("problem while upgrade http connection to webscket: %v", err)
-			return
-		}
-		client := app.addClient(conn)
+	wsGroup := ginEngine.Group("/ws/").Use(middleware.JwtCheck(app.Config.JwtSecret))
+	{
+		wsGroup.GET("/connect", func(c *gin.Context) {
+			conn, err := app.httpConnectionUpgraded.Upgrade(c.Writer, c.Request, nil)
+			if err != nil {
+				fmt.Printf("problem while upgrade http connection to webscket: %v", err)
+				return
+			}
+			client := app.addClient(conn)
 
-		app.sendHook(NewHook(CLIENT_ADDED, client.ID))
+			app.sendHook(NewHook(CLIENT_ADDED, client.ID))
 
-		if err := client.Handler(app); err != nil {
-			fmt.Printf("cannot handle client: %v", err)
-		}
-	})
+			if err := client.Handler(app); err != nil {
+				fmt.Printf("cannot handle client: %v", err)
+			}
+		})
+	}
 
 	//Set cors
 	ginEngine.Use(cors.New(app.Config.CorsOptions))
