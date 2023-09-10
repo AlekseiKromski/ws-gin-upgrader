@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/websocket"
-	"github.com/kjk/betterguid"
 )
 
 type Clients map[string]*Client
@@ -14,10 +13,10 @@ type Client struct {
 	ID   string
 }
 
-func CreateNewClient(connection *websocket.Conn) *Client {
+func CreateNewClient(clientID string, connection *websocket.Conn) *Client {
 	return &Client{
 		Conn: connection,
-		ID:   betterguid.New(),
+		ID:   clientID,
 	}
 }
 

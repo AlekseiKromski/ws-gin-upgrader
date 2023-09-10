@@ -76,12 +76,18 @@ func (app *App) serverConfigure() error {
 	wsGroup := ginEngine.Group("/ws/").Use(middleware.JwtCheck(app.Config.JwtSecret))
 	{
 		wsGroup.GET("/connect", func(c *gin.Context) {
+			userID, exists := c.Get("uid")
+			if !exists {
+				c.Status(http.StatusForbidden)
+				return
+			}
+
 			conn, err := app.httpConnectionUpgraded.Upgrade(c.Writer, c.Request, nil)
 			if err != nil {
 				fmt.Printf("problem while upgrade http connection to webscket: %v", err)
 				return
 			}
-			client := app.addClient(conn)
+			client := app.addClient(userID.(string), conn)
 
 			app.sendHook(NewHook(CLIENT_ADDED, client.ID))
 
@@ -107,12 +113,12 @@ func (app *App) sendHook(h HookType) {
 	}
 }
 
-func (app *App) addClient(conn *websocket.Conn) *Client {
+func (app *App) addClient(userID string, conn *websocket.Conn) *Client {
 	app.mutex.Lock()
 	defer app.mutex.Unlock()
 
 	for {
-		c := CreateNewClient(conn)
+		c := CreateNewClient(userID, conn)
 		if app.Clients[c.ID] == nil {
 			app.Clients[c.ID] = c
 			return c
