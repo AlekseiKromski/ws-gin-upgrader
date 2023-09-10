@@ -32,6 +32,15 @@ func (c *Client) Handler(app *App) error {
 	return nil
 }
 
+func (c *Client) Send(payload string, action HandlerName) error {
+	am := ActionModel{
+		Action:  action,
+		Payload: payload,
+	}
+
+	return c.Conn.WriteJSON(am)
+}
+
 func (c *Client) startReceiveChannel(app *App) {
 	defer func() {
 		c.Conn.Close()
@@ -71,7 +80,7 @@ func (c *Client) startReceiveChannel(app *App) {
 			continue
 		}
 
-		handler.Handle(am.Payload, c, app.clients)
+		handler.Handle(am.Payload, c, app.Clients)
 	}
 }
 

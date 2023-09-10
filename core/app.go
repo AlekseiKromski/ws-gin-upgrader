@@ -27,7 +27,7 @@ type App struct {
 	Hooks                  chan HookType
 	Engine                 *gin.Engine
 	Config                 *Config
-	clients                Clients
+	Clients                Clients
 	handlers               *Handlers
 	server                 string
 	httpConnectionUpgraded websocket.Upgrader
@@ -35,7 +35,7 @@ type App struct {
 }
 
 func Start(hs *Handlers, conf *Config) (*App, error) {
-	app := App{Config: conf, clients: make(Clients), mutex: sync.Mutex{}}
+	app := App{Config: conf, Clients: make(Clients), mutex: sync.Mutex{}}
 
 	//Start application
 	app.runApp(hs)
@@ -109,8 +109,8 @@ func (app *App) addClient(conn *websocket.Conn) *Client {
 
 	for {
 		c := CreateNewClient(conn)
-		if app.clients[c.ID] == nil {
-			app.clients[c.ID] = c
+		if app.Clients[c.ID] == nil {
+			app.Clients[c.ID] = c
 			return c
 		}
 	}
@@ -120,9 +120,9 @@ func (app *App) removeClient(id string) {
 	app.mutex.Lock()
 	defer app.mutex.Unlock()
 
-	if app.clients[id] == nil {
+	if app.Clients[id] == nil {
 		return
 	}
 
-	delete(app.clients, id)
+	delete(app.Clients, id)
 }
