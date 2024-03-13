@@ -9,14 +9,12 @@ import (
 
 func JwtCheck(secret []byte) func(ctx *gin.Context) {
 	return func(c *gin.Context) {
-		tokenRequest := c.Request.Header.Get("Authorization")
+		tokenRequest := c.Query("token")
 		if tokenRequest == "" || len(tokenRequest) < 10 {
 			c.Status(http.StatusForbidden)
 			c.Abort()
 			return
 		}
-
-		tokenRequest = tokenRequest[6:len(tokenRequest)]
 
 		token, err := jwt.Parse(tokenRequest, func(token *jwt.Token) (interface{}, error) {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
