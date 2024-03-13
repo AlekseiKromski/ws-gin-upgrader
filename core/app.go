@@ -3,14 +3,12 @@ package core
 import (
 	"fmt"
 	"github.com/AlekseiKromski/at-socket-server/middleware"
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"log"
 	"net/http"
 	"sync"
 )
-
-type WebSocket struct{}
 
 type HookType struct {
 	HookType HookTypes
@@ -26,17 +24,17 @@ func NewHook(ht HookTypes, data string) HookType {
 
 type App struct {
 	Hooks                  chan HookType
-	Engine                 *gin.Engine
 	Config                 *Config
 	Clients                Clients
+	engine                 *gin.Engine
 	handlers               *Handlers
 	server                 string
 	httpConnectionUpgraded websocket.Upgrader
 	mutex                  sync.Mutex
 }
 
-func Start(hs *Handlers, conf *Config) (*App, error) {
-	app := App{Config: conf, Clients: make(Clients), mutex: sync.Mutex{}}
+func Start(engine *gin.Engine, hs *Handlers, conf *Config) (*App, error) {
+	app := App{engine: engine, Config: conf, Clients: make(Clients), mutex: sync.Mutex{}}
 
 	//Start application
 	app.runApp(hs)
@@ -63,8 +61,6 @@ func (app *App) initHooksChannel() {
 }
 
 func (app *App) serverConfigure() error {
-	ginEngine := gin.Default()
-
 	app.httpConnectionUpgraded = websocket.Upgrader{
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
@@ -73,7 +69,7 @@ func (app *App) serverConfigure() error {
 		},
 	}
 
-	wsGroup := ginEngine.Group("/ws/").Use(middleware.JwtCheck(app.Config.JwtSecret))
+	wsGroup := app.engine.Group("/ws/").Use(middleware.JwtCheck(app.Config.JwtSecret))
 	{
 		wsGroup.GET("/connect", func(c *gin.Context) {
 			userID, exists := c.Get("uid")
@@ -84,7 +80,7 @@ func (app *App) serverConfigure() error {
 
 			conn, err := app.httpConnectionUpgraded.Upgrade(c.Writer, c.Request, nil)
 			if err != nil {
-				fmt.Printf("problem while upgrade http connection to webscket: %v", err)
+				log.Printf("problem while upgrade http connection to webscket: %v", err)
 				return
 			}
 			client := app.addClient(userID.(string), conn)
@@ -96,11 +92,6 @@ func (app *App) serverConfigure() error {
 			}
 		})
 	}
-
-	//Set cors
-	ginEngine.Use(cors.New(app.Config.CorsOptions))
-
-	app.Engine = ginEngine
 
 	app.sendHook(NewHook(SERVER_STARTED, fmt.Sprintf("gin egine created")))
 	return nil

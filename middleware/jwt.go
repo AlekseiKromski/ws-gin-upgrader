@@ -16,7 +16,7 @@ func JwtCheck(secret []byte) func(ctx *gin.Context) {
 			return
 		}
 
-		tokenRequest = tokenRequest[7:len(tokenRequest)]
+		tokenRequest = tokenRequest[6:len(tokenRequest)]
 
 		token, err := jwt.Parse(tokenRequest, func(token *jwt.Token) (interface{}, error) {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
