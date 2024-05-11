@@ -1,9 +1,8 @@
-module github.com/AlekseiKromski/at-socket-server
+module github.com/AlekseiKromski/ws-gin-upgrader
 
 go 1.18
 
 require (
-	github.com/gin-contrib/cors v1.4.0
 	github.com/gin-gonic/gin v1.9.1
 	github.com/gorilla/websocket v1.5.0
 	github.com/stretchr/testify v1.8.4
