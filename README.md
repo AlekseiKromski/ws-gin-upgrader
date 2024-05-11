@@ -1,4 +1,4 @@
-# at-socket-server core 🤯
-This repository helps developers, who want to write application with lightful system, that use web sockets
+# ws-gin-upgrader
+Lightweight library for upgrading http connection to websocket for GIN platform with JWT authorization
 
 
