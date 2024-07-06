@@ -34,7 +34,9 @@ type App struct {
 }
 
 func Start(engine *gin.Engine, hs *Handlers, middleware func(c *gin.Context), conf *Config) (*App, error) {
-	app := App{engine: engine, Config: conf, Clients: make(Clients), mutex: sync.Mutex{}, middleware: middleware}
+	app := App{engine: engine, Config: conf, Clients: Clients{
+		make(map[string][]*Session),
+	}, mutex: sync.Mutex{}, middleware: middleware}
 
 	//Start application
 	app.runApp(hs)
@@ -111,28 +113,41 @@ func (app *App) sendHook(h HookType) {
 	}
 }
 
-func (app *App) addClient(userID string, conn *websocket.Conn) *Client {
+func (app *App) addClient(userID string, conn *websocket.Conn) *Session {
 	app.mutex.Lock()
 	defer app.mutex.Unlock()
 
 	c := CreateNewClient(userID, conn)
-	if app.Clients[c.ID] != nil {
-		app.Clients[c.ID].Conn.Close()
-	}
 
-	app.Clients[c.ID] = c
+	app.Clients.storage[c.ID] = append(app.Clients.storage[c.ID], c)
 	return c
 }
 
-func (app *App) removeClient(id string) {
+func (app *App) removeClient(id, sid string) {
 	app.mutex.Lock()
 	defer app.mutex.Unlock()
 
-	if app.Clients[id] == nil {
+	if app.Clients.storage[id] == nil {
 		return
 	}
 
-	delete(app.Clients, id)
+	// Filter out from the client by session id
+	clients := []*Session{}
+	for _, client := range app.Clients.storage[id] {
+		if client.SID == sid {
+			continue
+		}
+
+		clients = append(clients, client)
+	}
+
+	// If we don't have active connections, no need to save this client
+	if len(clients) == 0 {
+		delete(app.Clients.storage, id)
+		return
+	}
+
+	app.Clients.storage[id] = clients
 }
 
 func (app *App) log(l string) {

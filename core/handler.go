@@ -1,7 +1,7 @@
 package core
 
 type Handler interface {
-	Handle(payload string, client *Client, clients Clients)
+	Handle(payload string, session *Session, clients Clients)
 }
 
 type HandlerName string
