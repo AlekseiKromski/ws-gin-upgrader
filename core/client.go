@@ -8,11 +8,11 @@ import (
 )
 
 type Clients struct {
-	storage map[string][]*Session
+	Storage map[string][]*Session
 }
 
 func (c *Clients) Send(uid, payload string, action HandlerName) error {
-	for _, session := range c.storage[uid] {
+	for _, session := range c.Storage[uid] {
 		am := ActionModel{
 			Action:  action,
 			Payload: payload,

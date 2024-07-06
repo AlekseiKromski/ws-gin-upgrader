@@ -119,7 +119,7 @@ func (app *App) addClient(userID string, conn *websocket.Conn) *Session {
 
 	c := CreateNewClient(userID, conn)
 
-	app.Clients.storage[c.ID] = append(app.Clients.storage[c.ID], c)
+	app.Clients.Storage[c.ID] = append(app.Clients.Storage[c.ID], c)
 	return c
 }
 
@@ -127,13 +127,13 @@ func (app *App) removeClient(id, sid string) {
 	app.mutex.Lock()
 	defer app.mutex.Unlock()
 
-	if app.Clients.storage[id] == nil {
+	if app.Clients.Storage[id] == nil {
 		return
 	}
 
 	// Filter out from the client by session id
 	clients := []*Session{}
-	for _, client := range app.Clients.storage[id] {
+	for _, client := range app.Clients.Storage[id] {
 		if client.SID == sid {
 			continue
 		}
@@ -143,11 +143,11 @@ func (app *App) removeClient(id, sid string) {
 
 	// If we don't have active connections, no need to save this client
 	if len(clients) == 0 {
-		delete(app.Clients.storage, id)
+		delete(app.Clients.Storage, id)
 		return
 	}
 
-	app.Clients.storage[id] = clients
+	app.Clients.Storage[id] = clients
 }
 
 func (app *App) log(l string) {
