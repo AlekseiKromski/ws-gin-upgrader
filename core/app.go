@@ -54,10 +54,12 @@ func (app *App) runApp(hs *Handlers) {
 
 func (app *App) registerHandlers(hs *Handlers) {
 	app.handlers = hs
+	app.log("handlers registered")
 }
 
 func (app *App) initHooksChannel() {
 	app.Hooks = make(chan HookType)
+	app.log("hooks initiated")
 }
 
 func (app *App) serverConfigure() error {
@@ -68,6 +70,10 @@ func (app *App) serverConfigure() error {
 			return true
 		},
 	}
+	app.log("WebsocketUpgrader config: ")
+	app.log("	- Check origin: true (configured in function)") // Default value is true always
+	app.log(fmt.Sprintf("	- Read buffer size: %d", app.httpConnectionUpgraded.ReadBufferSize))
+	app.log(fmt.Sprintf("	- Write buffer size: %d", app.httpConnectionUpgraded.WriteBufferSize))
 
 	wsGroup := app.engine.Group("/ws/").Use(app.middleware)
 	{
@@ -93,7 +99,8 @@ func (app *App) serverConfigure() error {
 		})
 	}
 
-	app.sendHook(NewHook(SERVER_STARTED, fmt.Sprintf("gin egine created")))
+	app.log("Created new router group '/ws/'")
+	app.log("Created new router endpoint with handler '/connect/'")
 	return nil
 }
 
@@ -126,4 +133,8 @@ func (app *App) removeClient(id string) {
 	}
 
 	delete(app.Clients, id)
+}
+
+func (app *App) log(l string) {
+	log.Printf("[%s] %s", "WS-GIN-UPGRADER", l)
 }
