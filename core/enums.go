@@ -3,7 +3,6 @@ package core
 type HookTypes string
 
 const (
-	SERVER_STARTED           HookTypes = "SERVER_STARTED"
 	CLIENT_ADDED             HookTypes = "CLIENT_ADDED"
 	CLIENT_CLOSED_CONNECTION HookTypes = "CLIENT_CLOSED_CONNECTION"
 	ERROR                    HookTypes = "ERROR"
