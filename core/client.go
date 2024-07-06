@@ -61,10 +61,6 @@ func (c *Client) startReceiveChannel(app *App) {
 			return
 		}
 
-		if app.Config.Debug {
-			fmt.Printf("Payload: %s", string(message))
-		}
-
 		am := ActionModel{}
 		if err := json.Unmarshal(message, &am); err != nil {
 			if err := c.Conn.WriteJSON(ActionModel{
